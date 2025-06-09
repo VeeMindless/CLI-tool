@@ -1,0 +1,91 @@
+name: CI for CLI-tool
+
+# When to run: on every push to main branch
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Job 1: Test the PowerShell script
+  test:
+    name: Test CLI-tool
+    runs-on: windows-latest
+    
+    steps:
+    # Download the code
+    - name: Get the code
+      uses: actions/checkout@v4
+      
+    # Run our tests
+    - name: Run tests
+      shell: pwsh
+      run: |
+        tests\tests.ps1 -NonInteractive
+
+    # Run the CLI-tool [1/2]
+    - name: Run CLI-tool (CSV)
+      shell: pwsh
+      run: |
+        .\CLI-tool.ps1 CSV
+
+     # Run the CLI-tool [2/2]
+    - name: Run CLI-tool (JSON)
+      shell: pwsh
+      run: |
+        .\CLI-tool.ps1 JSON
+        
+    # Save test results
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: |
+          *.csv
+          *.json
+
+  # Job 2: Check code quality
+  quality-check:
+    name: Check Code Quality
+    runs-on: windows-latest
+    
+    steps:
+    - name: Get the code
+      uses: actions/checkout@v4
+      
+    # Syntax check
+    - name: Check PowerShell syntax
+      shell: pwsh
+      run: |
+        try {
+          $null = [System.Management.Automation.PSParser]::Tokenize((Get-Content .\CLI-tool.ps1 -Raw), [ref]$null)
+          Write-Host "✓ PowerShell syntax is valid" -ForegroundColor Green
+        } catch {
+          Write-Host "✗ PowerShell syntax error: $($_.Exception.Message)" -ForegroundColor Red
+          exit 1
+        }
+
+  # Job 3: Deploy to test server (only runs after tests pass)
+  deploy:
+    name: Deploy to Test Server
+    runs-on: ubuntu-latest
+    needs: [test, quality-check]  # Only run if tests pass
+    if: github.ref == 'refs/heads/main'  # Only deploy from main branch
+    
+    steps:
+    - name: Get the code
+      uses: actions/checkout@v4
+      
+    # Install Ansible
+    - name: Install Ansible
+      run: |
+        pip install ansible pywinrm
+        
+    # Deploy using our simple playbook
+    - name: Deploy CLI-tool
+      env:
+        ANSIBLE_HOST_KEY_CHECKING: False
+      run: |
+        ansible-playbook -i deployment/ansible/hosts.yml deployment/ansible/cli-tool-deploy.yml
