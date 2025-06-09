@@ -18,7 +18,7 @@ The tool generates comprehensive process information including:
 This project includes two ways to visualize your process data:
 
 ### LibreOffice Calc Charts
-- **Guide**: [docs/visualization-guide.odt](docs/visualization-guide.odt)
+- **Guide**: [docs/visualization-guide.odt](docs/Visualization guide.odt)
 - Create charts in LibreOffice Calc
 - Three chart types: Memory usage bar chart, User distribution donut chart, CPU vs Memory scatter plot
 
