@@ -146,7 +146,7 @@ Deploy to multiple Windows servers automatically:
 The repository includes GitHub Actions that automatically:
 1. **Tests** your code on every commit
 2. **Validates** PowerShell syntax
-3. **Deploys** to test servers when tests pass
+3. **Deploys** to test servers when tests pass (note that ansible hosts.yml file must be edited with correct IPs accordingly)
 
 Pipeline status: [![CI Status](https://github.com/VeeMindless/cli-tool/workflows/Simple%20CI%20for%20CLI-tool/badge.svg)](https://github.com/VeeMindless/cli-tool/actions)
 
@@ -175,7 +175,6 @@ cli-tool/
 ├── tests/tests.ps1              # Test script
 ├── deployment/ansible/          # Ansible deployment
 ├── docs/                        # Documentation & dashboard
-├── examples/                    # Sample outputs
 └── .github/workflows/           # CI/CD pipeline
 ```
 
