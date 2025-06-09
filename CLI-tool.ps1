@@ -9,6 +9,8 @@
 # Version:             1.0.1
 # Changelog:
 #                      05/06/2025 - V. 1.0.1 - Remove vars from Get-ProcessInfo() and consolidate conditionals into the custom object
+#                                            - Add Status, PriorityClass, Path and Company to the reports
+#
 #                      04/06/2025 - V. 1.0.0 - Initial commit
 #
 #
@@ -20,7 +22,6 @@
 
 param
 (
-    [Parameter(Mandatory)]
     [ValidateSet("CSV", "JSON")]
     [string]$OutputFormat = "CSV",
     [string]$OutputFile = "",
@@ -87,6 +88,10 @@ function Get-ProcessInfo
         CPUUsage      = if ($_.CPU) { [math]::Round($_.CPU, 2) } else { 0 }
         MemoryUsageMB = if ($_.WorkingSet) { [math]::Round($_.WorkingSet / 1MB, 2) } else { 0 }
         StartTime     = if ($_.StartTime) { $_.StartTime.ToString("yyyy-MM-dd HH:mm:ss") } else { "Unknown" }
+        Status        = if ($_.Responding) { "Responding" } else { "Not Responding" }
+        PriorityClass = if ($_.PriorityClass) { $_.PriorityClass } else { "Unknown" }
+        Path          = if ($_.Path) { $_.Path } else { "N/A" }
+        Company       = if ($_.Company) { $_.Company } else { "Not Specified" }
         }
     }
 }
@@ -106,18 +111,30 @@ function Export-Data
     
     try 
     {
-        $outputPath = if ($FilePath)
-        {    
+        $outputPath = if ($FilePath) 
+        {
+            # Get basename without extension
+            $fileName = [System.IO.Path]::GetFileName($FilePath)
+            $baseFileName = $fileName.Split('.')[0]
+            $directory = [System.IO.Path]::GetDirectoryName($FilePath)
+    
             # Convert input path to absolute based on current working directory and append format extension based on 1st param
             # eg. script in C:/bin/scripts, user input: "report" => C:/bin/scripts/report.csv"
             if (-not [System.IO.Path]::IsPathRooted($FilePath)) 
             {
-                Join-Path -Path (Get-Location) -ChildPath "$FilePath.$($Format.ToLower())"
+                $directory = if ($directory) 
+                { 
+                    Join-Path -Path (Get-Location) -ChildPath $directory 
+                } 
+                else 
+                { 
+                    Get-Location 
+                }
             }
-            else
-            {
-                $FilePath
-            }
+    
+            # Add format as an extension
+            $extension = $Format.ToLower()
+            Join-Path -Path $directory -ChildPath "$baseFileName.$extension"
         }
         else
         {   # Default path if not specified by user

@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Report - Interactive Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+        }
+        .header {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header p {
+            font-size: 1.2em;
+            color: #7f8c8d;
+        }
+        .file-upload {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+            transition: all 0.3s ease;
+        }
+        .file-upload:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        .file-upload input[type="file"] {
+            margin: 10px;
+            padding: 10px 20px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        .file-upload input[type="file"]:hover {
+            background: #5a6fd8;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            transition: transform 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        .metric-value {
+            font-size: 2.8em;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .metric-label {
+            font-size: 1em;
+            opacity: 0.9;
+            font-weight: 500;
+        }
+        .chart-container {
+            margin: 40px 0;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: box-shadow 0.3s ease;
+        }
+        .chart-container:hover {
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        .chart-title {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+            font-weight: 600;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        }
+        .data-table th, .data-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .data-table th {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: background 0.2s ease;
+        }
+        .data-table th:hover {
+            background: linear-gradient(135deg, #5a6fd8, #6d4c92);
+        }
+        .data-table th.sortable::after {
+            content: ' ↕️';
+            font-size: 0.8em;
+            margin-left: 5px;
+        }
+        .data-table th.sort-asc::after {
+            content: ' ↑';
+            color: #fff;
+        }
+        .data-table th.sort-desc::after {
+            content: ' ↓';
+            color: #fff;
+        }
+        .data-table tr:hover {
+            background-color: #f8f9ff;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .responding { background-color: #2ecc71; }
+        .not-responding { background-color: #e74c3c; }
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #7f8c8d;
+            font-size: 1.2em;
+        }
+        .error {
+            background: #ffe6e6;
+            border: 1px solid #ffcccc;
+            color: #cc0000;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions {
+            background: linear-gradient(135deg, #e8f4fd, #f0f8ff);
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 30px 0;
+            border-radius: 10px;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ Process Report Dashboard</h1>
+            <p><strong>Interactive Visualization</strong> - Real-time Process Analysis</p>
+            <small>Generated: <span id="currentDate"></span></small>
+        </div>
+		
+		<div class="instructions">
+            <h4>🚀 Quick Start</h4>
+            <p><strong>Step 1:</strong> Run <code>.\CLI-tool.ps1 -OutputFormat CSV -OutputFile "processes.csv"</code></p>
+            <p><strong>Step 2:</strong> Click "Choose File" above and select your generated CSV/JSON file</p>
+            <p><strong>Step 3:</strong> Watch your data come to life with interactive charts!</p>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="file-upload">
+            <h4>📂 Load Your Process Data</h4>
+            <p>Upload your CSV or JSON file generated by CLI-tool.ps1</p>
+            <input type="file" id="fileInput" accept=".csv,.json" />
+            <div id="fileStatus"></div>
+        </div>
+
+        <!-- Key Metrics -->
+        <div class="metrics-grid" id="metricsGrid">
+            <div class="metric-card">
+                <div class="metric-value" id="totalProcesses">-</div>
+                <div class="metric-label">Total Processes</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="totalMemory">-</div>
+                <div class="metric-label">Total Memory (MB)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="uniqueUsers">-</div>
+                <div class="metric-label">Unique Users</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="avgMemory">-</div>
+                <div class="metric-label">Avg Memory (MB)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="notResponding">-</div>
+                <div class="metric-label">Not Responding</div>
+            </div>
+        </div>
+
+        <!-- Chart 1: Top Memory Consumers -->
+        <div class="chart-container">
+            <div class="chart-title">🧠 Top 10 Memory Consuming Processes</div>
+            <div class="chart-wrapper">
+                <canvas id="memoryChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 2: Processes by User -->
+        <div class="chart-container">
+            <div class="chart-title">👥 Process Distribution by User</div>
+            <div class="chart-wrapper">
+                <canvas id="userChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 3: CPU vs Memory Scatter Plot -->
+        <div class="chart-container">
+            <div class="chart-title">⚡ CPU Usage vs Memory Usage Distribution</div>
+            <div class="chart-wrapper">
+                <canvas id="scatterChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Process Data Table -->
+        <div class="chart-container">
+            <div class="chart-title">📋 Process Details</div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th class="sortable" data-column="ProcessName" data-type="string">Process Name</th>
+                        <th class="sortable" data-column="User" data-type="string">User</th>
+                        <th class="sortable" data-column="CPUUsage" data-type="number">CPU Usage (s)</th>
+                        <th class="sortable" data-column="MemoryUsageMB" data-type="number">Memory (MB)</th>
+                        <th class="sortable" data-column="Status" data-type="string">Status</th>
+                        <th class="sortable" data-column="StartTime" data-type="string">Start Time</th>
+                    </tr>
+                </thead>
+                <tbody id="processTable">
+                    <tr><td colspan="6" class="loading">Load a CSV or JSON file to see process data</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let processData = [];
+        let charts = {};
+        let currentSort = { column: 'MemoryUsageMB', direction: 'desc' }; // Default sort by memory descending
+
+        // Set current date
+        document.getElementById('currentDate').textContent = new Date().toLocaleString();
+
+        // File input handler
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+        // Add click listeners to table headers for sorting
+        document.addEventListener('DOMContentLoaded', function() {
+            const sortableHeaders = document.querySelectorAll('.sortable');
+            sortableHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = this.getAttribute('data-column');
+                    const type = this.getAttribute('data-type');
+                    sortTable(column, type, this);
+                });
+            });
+        });
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const fileStatus = document.getElementById('fileStatus');
+            fileStatus.innerHTML = '<div class="loading">Loading data...</div>';
+
+            try {
+                const text = await file.text();
+                const fileExtension = file.name.split('.').pop().toLowerCase();
+
+                if (fileExtension === 'csv') {
+                    processData = parseCSV(text);
+                } else if (fileExtension === 'json') {
+                    processData = JSON.parse(text);
+                } else {
+                    throw new Error('Unsupported file format. Please use CSV or JSON.');
+                }
+
+                if (processData.length === 0) {
+                    throw new Error('No data found in file.');
+                }
+
+                fileStatus.innerHTML = `<div style="color: green;">✓ Successfully loaded ${processData.length} processes</div>`;
+                
+                // Update dashboard
+                updateMetrics();
+                createCharts();
+                updateTable();
+
+            } catch (error) {
+                fileStatus.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                console.error('File processing error:', error);
+            }
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length < 2) return [];
+
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const data = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (let char of lines[i]) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim());
+
+                const processObj = {};
+                headers.forEach((header, index) => {
+                    let value = values[index] || '';
+                    value = value.replace(/"/g, '');
+                    
+                    // Convert numeric fields
+                    if (header === 'MemoryUsageMB' || header === 'CPUUsage') {
+                        processObj[header] = parseFloat(value) || 0;
+                    } else if (header === 'ProcessID') {
+                        processObj[header] = parseInt(value) || 0;
+                    } else {
+                        processObj[header] = value;
+                    }
+                });
+
+                if (processObj.ProcessName) {
+                    data.push(processObj);
+                }
+            }
+
+            return data;
+        }
+
+        function updateMetrics() {
+            const totalProcesses = processData.length;
+            const totalMemory = processData.reduce((sum, p) => sum + (p.MemoryUsageMB || 0), 0);
+            const uniqueUsers = new Set(processData.map(p => p.User || 'Unknown')).size;
+            const avgMemory = totalMemory / totalProcesses;
+            const notResponding = processData.filter(p => p.Status === 'Not Responding').length;
+
+            document.getElementById('totalProcesses').textContent = totalProcesses;
+            document.getElementById('totalMemory').textContent = Math.round(totalMemory).toLocaleString();
+            document.getElementById('uniqueUsers').textContent = uniqueUsers;
+            document.getElementById('avgMemory').textContent = Math.round(avgMemory * 100) / 100;
+            document.getElementById('notResponding').textContent = notResponding;
+        }
+
+        function createCharts() {
+            createMemoryChart();
+            createUserChart();
+            createScatterChart();
+        }
+
+        function createMemoryChart() {
+            const ctx = document.getElementById('memoryChart').getContext('2d');
+            
+            // Destroy existing chart
+            if (charts.memory) charts.memory.destroy();
+
+            // Get top 10 memory consumers
+            const topMemory = processData
+                .sort((a, b) => (b.MemoryUsageMB || 0) - (a.MemoryUsageMB || 0))
+                .slice(0, 10);
+
+            charts.memory = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topMemory.map(p => p.ProcessName || 'Unknown'),
+                    datasets: [{
+                        label: 'Memory Usage (MB)',
+                        data: topMemory.map(p => p.MemoryUsageMB || 0),
+                        backgroundColor: topMemory.map((p, i) => {
+                            const memory = p.MemoryUsageMB || 0;
+                            if (memory > 200) return '#e74c3c'; // Red for high
+                            if (memory > 100) return '#f39c12'; // Orange for medium
+                            return '#2ecc71'; // Green for low
+                        }),
+                        borderColor: '#2c3e50',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Memory Usage (MB)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Process Name'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createUserChart() {
+            const ctx = document.getElementById('userChart').getContext('2d');
+            
+            if (charts.user) charts.user.destroy();
+
+            // Count processes by user
+            const userCounts = {};
+            processData.forEach(p => {
+                const user = p.User || 'Unknown';
+                userCounts[user] = (userCounts[user] || 0) + 1;
+            });
+
+            const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e'];
+
+            charts.user = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(userCounts),
+                    datasets: [{
+                        data: Object.values(userCounts),
+                        backgroundColor: colors.slice(0, Object.keys(userCounts).length),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createScatterChart() {
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            
+            if (charts.scatter) charts.scatter.destroy();
+
+            charts.scatter = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Processes',
+                        data: processData.map(p => ({
+                            x: p.CPUUsage || 0,
+                            y: p.MemoryUsageMB || 0,
+                            processName: p.ProcessName || 'Unknown'
+                        })),
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        pointRadius: 6,
+                        pointHoverRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.raw.processName}: CPU ${context.parsed.x}s, Memory ${context.parsed.y}MB`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'CPU Usage (seconds)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Memory Usage (MB)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTable() {
+            const tableBody = document.getElementById('processTable');
+            
+            // Clear existing rows
+            tableBody.innerHTML = '';
+
+            // Apply current sorting
+            let sortedProcesses = [...processData];
+            if (currentSort.column) {
+                sortedProcesses = sortProcesses(sortedProcesses, currentSort.column, currentSort.direction);
+            }
+
+            // Show top 20 processes
+            const topProcesses = sortedProcesses.slice(0, 20);
+
+            topProcesses.forEach(process => {
+                const row = tableBody.insertRow();
+                const statusClass = process.Status === 'Responding' ? 'responding' : 'not-responding';
+                
+                row.innerHTML = `
+                    <td>${process.ProcessName || 'Unknown'}</td>
+                    <td>${process.User || 'Unknown'}</td>
+                    <td>${process.CPUUsage || 0}</td>
+                    <td>${process.MemoryUsageMB || 0}</td>
+                    <td><span class="status-indicator ${statusClass}"></span>${process.Status || 'Unknown'}</td>
+                    <td>${process.StartTime || 'Unknown'}</td>
+                `;
+            });
+
+            // Update header sort indicators
+            updateSortIndicators();
+        }
+
+        function sortTable(column, type, headerElement) {
+            // Determine sort direction
+            if (currentSort.column === column) {
+                if (currentSort.direction === 'asc') {
+                    currentSort.direction = 'desc';
+                } else if (currentSort.direction === 'desc') {
+                    // Reset to default (memory descending)
+                    currentSort.column = 'MemoryUsageMB';
+                    currentSort.direction = 'desc';
+                } else {
+                    currentSort.direction = 'asc';
+                }
+            } else {
+                currentSort.column = column;
+                currentSort.direction = 'asc';
+            }
+
+            updateTable();
+        }
+
+        function sortProcesses(processes, column, direction) {
+            return processes.sort((a, b) => {
+                let valueA = a[column] || '';
+                let valueB = b[column] || '';
+
+                // Handle numeric sorting
+                if (column === 'CPUUsage' || column === 'MemoryUsageMB') {
+                    valueA = parseFloat(valueA) || 0;
+                    valueB = parseFloat(valueB) || 0;
+                } else {
+                    // Handle string sorting
+                    valueA = valueA.toString().toLowerCase();
+                    valueB = valueB.toString().toLowerCase();
+                }
+
+                if (direction === 'asc') {
+                    return valueA > valueB ? 1 : valueA < valueB ? -1 : 0;
+                } else {
+                    return valueA < valueB ? 1 : valueA > valueB ? -1 : 0;
+                }
+            });
+        }
+
+        function updateSortIndicators() {
+            // Reset all headers
+            const sortableHeaders = document.querySelectorAll('.sortable');
+            sortableHeaders.forEach(header => {
+                header.classList.remove('sort-asc', 'sort-desc');
+            });
+
+            // Add indicator to current sort column
+            const currentHeader = document.querySelector(`[data-column="${currentSort.column}"]`);
+            if (currentHeader) {
+                if (currentSort.direction === 'asc') {
+                    currentHeader.classList.add('sort-asc');
+                } else if (currentSort.direction === 'desc') {
+                    currentHeader.classList.add('sort-desc');
+                }
+            }
+        }
+
+        // Load sample data if no file is uploaded
+        window.addEventListener('load', function() {
+            // Show sample data message
+            setTimeout(() => {
+                if (processData.length === 0) {
+                    document.getElementById('fileStatus').innerHTML = 
+                        '<div style="color: #7f8c8d;">💡 Upload your process data file to see real-time analysis</div>';
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

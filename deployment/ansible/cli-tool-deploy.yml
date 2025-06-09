@@ -1,0 +1,79 @@
+---
+
+- name: Deploy CLI-tool
+  hosts: all
+
+  tasks:
+    - name: CLI-TOOL | Create CLI-tool directory
+      win_file:
+        path: "C:\\Tools\\CLI-tool"
+        state: directory
+
+    - name: CLI-TOOL | Copy CLI-tool.ps1
+      win_copy:
+        src: "../../CLI-tool.ps1"
+        dest: "C:\\Tools\\CLI-tool\\CLI-tool.ps1"
+
+    - name: CLI-TOOL | Copy test script
+      win_copy:
+        src: "../../tests/tests.ps1"
+        dest: "C:\\Tools\\CLI-tool\\tests.ps1"
+
+    - name: CLI-TOOL | Set execution policy if restrictive
+      win_shell: |
+        $policy = Get-ExecutionPolicy
+        Write-Host "Current execution policy: $policy"
+        
+        if ($policy -eq "Restricted" -or $policy -eq "AllSigned") {
+            try {
+                Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
+                Write-Host "Successfully changed execution policy to RemoteSigned"
+            } catch {
+                # Try CurrentUser scope if LocalMachine fails
+                Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+                Write-Host "Set execution policy for CurrentUser scope"
+            }
+        } else {
+            Write-Host "Execution policy $policy is already permissive enough"
+        }
+      register: execution_policy_result
+
+    - name: CLI-TOOL | Show execution policy result
+      debug:
+        var: execution_policy_result.stdout_lines
+
+    - name: CLI-TOOL | Run installation test
+      win_shell: C:\Tools\CLI-tool\tests.ps1 -NonInteractive
+      register: test_result
+
+    - name: CLI-TOOL | Display test results
+      debug:
+        msg: "Installation test: {{ 'PASSED' if test_result.rc == 0 else 'FAILED' }}"
+
+    - name: CLI-TOOL | Fail if tests didn't pass
+      fail:
+        msg: "CLI-tool installation tests failed! Return code: {{ test_result.rc }}"
+      when: test_result.rc != 0
+
+    - name: CLI-TOOL | Set timestamp variable
+      set_fact:
+        timestamp: "{{ ansible_date_time.day }}{{ ansible_date_time.month }}{{ ansible_date_time.year }}_{{ ansible_date_time.hour }}{{ ansible_date_time.minute }}"
+      run_once: true
+
+    - name: CLI-TOOL | Create directory structure
+      file:
+        path: "./reports/{{ timestamp }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ groups['all'] }}"
+      delegate_to: localhost
+      run_once: true
+
+    - name: CLI-TOOL | Run CLI-tool
+      win_shell: C:\Tools\CLI-tool\CLI-tool.ps1 JSON -OutputFile C:\Tools\CLI-tool\report.json
+
+    - name: CLI-TOOL | Copy report to localhost
+      fetch:
+        src: C:\Tools\CLI-tool\report.json
+        dest: "./reports/{{ timestamp}}/{{ inventory_hostname }}/"
+        flat: True
