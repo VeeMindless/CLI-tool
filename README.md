@@ -139,7 +139,7 @@ Deploy to multiple Windows servers automatically:
 - Copies all files
 - Runs installation tests
 - Runs the CLI-tool if tests pass and generates a JSON report
-- Downloads the reports into ./reports/<timestamp>/<hostname>
+- Downloads the reports into ./reports/$timestamp>/$hostname
 
 #### CI/CD Pipeline Setup
 
